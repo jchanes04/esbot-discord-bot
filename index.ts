@@ -71,9 +71,9 @@ client.on('interactionCreate', async interaction => {
         verify(interaction.user, esbotGuild).catch((e) => {
             console.dir(e)
             if (e.message == `Player not found`) {
-                interaction.reply("Your discord tag couldnt be found in our database, please check if it was input into the registration site properly. Remember, you must include the 4 digits after the hash ex. `Bomjoe#9924`")
+                interaction.reply("Your discord tag couldnt be found in our database, please check if it was input into the registration site properly. Remember, you must include the 4 digits after the hash ex. `Bomjoe#9924`\n To re-initiate verification, please type `/verify` in this channel. Please contact an administrator if you are unable to get verfied.")
             } else {
-                interaction.reply("Verification Failed. DM a board member to be verified ")
+                interaction.reply("Verification Failed. DM a administrator to be verified")
             }
         })
     }
@@ -88,9 +88,9 @@ client.on('guildMemberAdd', async member => {
     }).catch((e) => {
         welcomeChannel.send(`Welcome <@${member.user.id}>! Please read the rules in <#${process.env.RULES_CHANNEL_ID}> and agree to them to gain access to the rest of the server`)
         if (e.message == `Player not found`) {
-            member.user.send("Your discord tag couldnt be found in our database, please check if it was input into the registration site properly. Remember, you must include the 4 digits after the hash ex. `Bomjoe#9924`.")
+            member.user.send("Your discord tag couldnt be found in our database, please check if it was input into the registration site properly. Remember, you must include the 4 digits after the hash ex. `Bomjoe#9924`\n To re-initiate verification, please type `/verify` in this channel. Please contact an administrator if you are unable to get verfied.")
         } else {
-            member.user.send("Verification Failed. DM a board member to be verified ")
+            member.user.send("Verification Failed. DM an adminstrator to be verified ")
         }
     })
 })
