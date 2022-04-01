@@ -33,7 +33,7 @@ const db = dbClient.db('esbot')
 const teamsCollection: Collection<DbTeam> = db.collection('teams')
 const usersCollection = db.collection('users')
 
-import { Guild, ReactionCollector, TextChannel, User } from 'discord.js'
+import { Guild, MessageEmbed, ReactionCollector, TextChannel, User } from 'discord.js'
 import { Client, Intents } from "discord.js"
 export const client = new Client({ intents: [ Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGE_REACTIONS, Intents.FLAGS.GUILD_MEMBERS ] })
 
@@ -46,7 +46,6 @@ client.on('ready', async () => {
 
     const esbotGuild = await client.guilds.fetch(process.env.ESBOT_GUILD_ID!)
     const rulesChannel = await esbotGuild.channels.fetch(process.env.RULES_CHANNEL_ID!) as TextChannel
-    
     const rulesMessage = await rulesChannel.messages.fetch(process.env.RULES_MESSAGE_ID!)
     const reactionCollector = new ReactionCollector(rulesMessage)
     reactionCollector.on('collect', async (reaction, user) => {
@@ -56,9 +55,16 @@ client.on('ready', async () => {
         }
         reaction.users.remove(user.id)
     })
+
+    const teamListChannel = await esbotGuild.channels.fetch(process.env.TEAM_LIST_CHANNEL_ID!) as TextChannel
+    const teamListMessage = await teamListChannel.messages.fetch(process.env.TEAM_LIST_MESSAGE_ID!)
     await fetchTeams(esbotGuild)
-    setInterval(() => {
-        fetchTeams(esbotGuild)
+    setInterval(async () => {
+        const teams = await fetchTeams(esbotGuild)
+        const embed = new MessageEmbed()
+            .setTitle("Team List")
+            .setDescription(teams.map(t => `**${t.teamName}** (${t.schoolName})`).join("\n"))
+        teamListMessage.edit({ embeds: [embed] })
     }, 300000)
 })
 
@@ -66,8 +72,8 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand())
         return
     
+    const esbotGuild = await client.guilds.fetch(process.env.ESBOT_GUILD_ID!)
     if (interaction.commandName === "verify") {
-        const esbotGuild = await client.guilds.fetch(process.env.ESBOT_GUILD_ID!)
         verify(interaction.user, esbotGuild).catch((e) => {
             console.dir(e)
             if (e.message == `Player not found`) {
@@ -75,6 +81,36 @@ client.on('interactionCreate', async interaction => {
             } else {
                 interaction.reply("Verification Failed. DM a administrator to be verified")
             }
+        })
+    } else if (interaction.commandName === "massverify") {
+        const members = await esbotGuild.members.fetch()
+        console.dir(members.map(m => m.id))
+        const verifiedMembers: string[] = []
+        const unverifiedMembers: string[] = []
+        await interaction.deferReply()
+        let delay = 0
+        await Promise.allSettled(members.map((m) => new Promise<void>((res, rej) => {
+            setTimeout(() => {
+                verify(m.user, esbotGuild).then(() => {
+                    verifiedMembers.push(m.nickname || m.user.username)
+                    res()
+                }).catch(() => {
+                    unverifiedMembers.push(m.nickname || m.user.username)
+                    rej()
+                })
+            }, delay)
+            delay += 50
+        })))
+        const embed = new MessageEmbed()
+            .setTitle("Members")
+            .addField("Verified Members", verifiedMembers.join("\n") || "None")
+            .addField("Unverified Members", unverifiedMembers.join("\n") || "None")
+        interaction.editReply({ embeds: [embed] })
+    } else if (interaction.commandName === "verifyuser") {
+        verify(interaction.options.getUser('user')!, esbotGuild).then(() => {
+            interaction.reply("User successfully verified")
+        }).catch(()  => {
+            interaction.reply("Failed to verify user")
         })
     }
 })
@@ -140,6 +176,7 @@ async function fetchTeams(guild: Guild) {
     }
 
     setTeamRolesData(newTeamList)
+    return newTeamList
 }
 
 async function verify(user: User, guild: Guild) {
@@ -149,7 +186,15 @@ async function verify(user: User, guild: Guild) {
         throw new Error(`Player not found`)
     const player = dbTeam.members.find(x => x.discordUsername === tag)
     const member = await guild.members.fetch(user.id)
-    member.setNickname(`${player?.firstName} ${player?.lastName} [${dbTeam.teamName}]`)
+
+    let newNickname = `${player?.firstName} ${player?.lastName} [${dbTeam.teamName}]`
+    if (newNickname.length >= 32) {
+        newNickname = `${player?.firstName} ${player?.lastName[0]}. [${dbTeam.teamName}]`
+        if (newNickname.length >= 32) {
+            newNickname = `${player?.firstName} ${player?.lastName[0]}. [${dbTeam.teamName.split(" ")[0]}]`
+        }
+    }
+    member.setNickname(newNickname)
     
     const teamRole = getTeamRolesData().find(x => x.teamId === dbTeam.id)
     if (!teamRole)
