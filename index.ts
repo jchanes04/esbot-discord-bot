@@ -64,6 +64,7 @@ client.on('ready', async () => {
         const embed = new MessageEmbed()
             .setTitle("Team List")
             .setDescription(teams.map(t => `**${t.teamName}** (${t.schoolName})`).join("\n"))
+            .setFooter({ text: `${teams.length} Teams` })
         teamListMessage.edit({ embeds: [embed] })
     }, 300000)
 })
@@ -84,7 +85,6 @@ client.on('interactionCreate', async interaction => {
         })
     } else if (interaction.commandName === "massverify") {
         const members = await esbotGuild.members.fetch()
-        console.dir(members.map(m => m.id))
         const verifiedMembers: string[] = []
         const unverifiedMembers: string[] = []
         await interaction.deferReply()
@@ -204,6 +204,5 @@ async function verify(user: User, guild: Guild) {
 }
 
 async function getTeamFromTag(tag: string): Promise<DbTeam | null> {
-    console.log(tag)
     return teamsCollection.findOne({ "members.discordUsername": tag })
 }
