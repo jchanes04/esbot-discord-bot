@@ -1,8 +1,9 @@
 import dotenv from 'dotenv'
 dotenv.config()
 
-import { Guild, MessageEmbed, ReactionCollector, TextChannel, User } from 'discord.js'
+import { ReactionCollector, TextChannel } from 'discord.js'
 import { Client, Intents } from "discord.js"
+import { getTeams } from './mongo.js'
 export const client = new Client({ intents: [ Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGE_REACTIONS, Intents.FLAGS.GUILD_MEMBERS ] })
 
 client.on('error', console.error)
@@ -20,6 +21,23 @@ client.on('ready', async () => {
         }
         reaction.users.remove(user.id)
     })
+
+    const teamListChannel = await esbotGuild.channels.fetch(process.env.TEAM_LIST_CHANNEL_ID!) as TextChannel
+    const teamListMessage = await teamListChannel.messages.fetch(process.env.TEAM_LIST_MESSAGE_ID!)
+    
+    setInterval(async () => {
+        const teams = await getTeams()
+        if (!teams) return console.log("Failed to fetch teams")
+    
+        teamListMessage.edit({
+            embeds: [{
+                "type": "rich",
+                "title": `Team List`,
+                "description": teams.map(t => t.name).join("\n"),
+                "color": 0x006242
+            }]
+        })
+    }, 300_000)
 })
 
 client.on('guildMemberAdd', async member => {
